@@ -1,0 +1,60 @@
+Received WebSocket message: { type: 'heartbeat', data: undefined }
+Unhandled message type: heartbeat
+Received WebSocket message: { type: 'heartbeat', data: undefined }
+Unhandled message type: heartbeat
+
+=== Received Extension Log ===
+Request body: {
+  dataType: 'network-request',
+  timestamp: 1758881121280,
+  hasSettings: true
+}
+Updating settings: {
+  logLimit: 50,
+  queryLimit: 30000,
+  showRequestHeaders: false,
+  showResponseHeaders: false
+}
+Processing network-request log entry
+Adding network request: {
+  url: 'http://172.16.8.71:8081/ris/v1/critical/getAlarmCount?examTypeName=ES&beginTime=2025-09-19%2000:00:00&endTime=2025-09-26%2023:59:59&timeOutTime=6000000',
+  method: 'GET',
+  status: 200,
+  timestamp: 1758881121280
+}
+Current log counts: {
+  consoleLogs: 0,
+  consoleErrors: 0,
+  networkErrors: 0,
+  networkSuccess: 20
+}
+=== End Extension Log ===
+
+
+=== Received Extension Log ===
+Request body: {
+  dataType: 'network-request',
+  timestamp: 1758881121409,
+  hasSettings: true
+}
+Updating settings: {
+  logLimit: 50,
+  queryLimit: 30000,
+  showRequestHeaders: false,
+  showResponseHeaders: false
+}
+Processing network-request log entry
+Adding network request: {
+  url: 'http://172.16.8.71:8081/ris/v1/executePoint/queryRefundInfo?beginTime=2025-09-26%2000:00:00&endTime=2025-09-26%2023:59:59&patientName=null',
+  method: 'GET',
+  status: 200,
+  timestamp: 1758881121409
+}
+Current log counts: {
+  consoleLogs: 0,
+  consoleErrors: 0,
+  networkErrors: 0,
+  networkSuccess: 21
+}
+=== End Extension Log ===
+
