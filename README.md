@@ -1,3 +1,11 @@
+<!--
+ * @Author: chenjie chenjie@huimei.com
+ * @Date: 2025-09-26 12:00:48
+ * @LastEditors: chenjie chenjie@huimei.com
+ * @LastEditTime: 2025-09-26 12:01:32
+ * @FilePath: /browser-tools/README.md
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+-->
 # Browser Tools 脚本集合
 
 这个目录包含了 browser-tools 相关的所有脚本和配置文件。
