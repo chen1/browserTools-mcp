@@ -294,6 +294,14 @@ while true; do
     # 智能清理逻辑：既要防止误停止server，又要避免孤儿进程
     server_exists=$(ps -ef | grep "browser-tools-server" | grep -v grep | wc -l | tr -d ' ')
     
+    # 🔧 新增：如果没有MCP进程且引用计数异常高（可能是泄漏），尝试修复引用计数
+    if [ "$current_count" -eq 0 ] && [ "$ref_count" -gt 10 ] && [ $elapsed_minutes -ge 1 ]; then
+        log_cleanup "⚠️ 检测到引用计数异常 (MCP进程数=0, 引用计数=$ref_count)，可能是计数泄漏"
+        log_cleanup "重置引用计数为0"
+        "$REF_COUNT_MANAGER" set 0
+        ref_count=0
+    fi
+    
     if [ "$current_count" -eq 0 ] && [ "$ref_count" -eq 0 ]; then
         if [ "$server_exists" -eq 0 ]; then
             # 没有server进程在运行，直接退出监控

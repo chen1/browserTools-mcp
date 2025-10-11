@@ -350,6 +350,14 @@ case "${1:-}" in
     "get")
         get_ref_count
         ;;
+    "set")
+        if [ -n "${2:-}" ]; then
+            set_ref_count "$2"
+        else
+            echo "错误: set命令需要提供计数值"
+            exit 1
+        fi
+        ;;
     "should-cleanup")
         if should_cleanup_server; then
             echo "true"
@@ -384,12 +392,13 @@ case "${1:-}" in
         fi
         ;;
     *)
-        echo "用法: $0 {increment|decrement|get|should-cleanup|cleanup|status|ensure-single-server|get-server-pid}"
+        echo "用法: $0 {increment|decrement|get|set|should-cleanup|cleanup|status|ensure-single-server|get-server-pid}"
         echo ""
         echo "命令说明:"
         echo "  increment           - 递增引用计数"
         echo "  decrement           - 递减引用计数"
         echo "  get                - 获取当前引用计数"
+        echo "  set <count>        - 设置引用计数为指定值"
         echo "  should-cleanup     - 检查是否应该清理server (返回true/false)"
         echo "  cleanup            - 清理引用计数文件"
         echo "  status             - 显示当前状态"

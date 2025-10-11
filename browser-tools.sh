@@ -586,7 +586,8 @@ stop_services_mcp_silent() {
             log_stop "$timestamp [info] 发现并终止服务器进程树 $SERVER_PID"
             log_stop "$timestamp [info] 命令: $process_cmd"
             
-            if echo "$process_cmd" | grep -q "@agentdeskai.*browser-tools-server"; then
+            # 修改安全检查：支持多种browser-tools-server进程格式
+            if echo "$process_cmd" | grep -qE "(browser-tools-server|@agentdeskai.*browser-tools)"; then
                 # 使用选择性进程树终止
                 kill_server_process_tree "$SERVER_PID" "TERM"
                 sleep 1
@@ -1371,15 +1372,49 @@ if [ "$IS_MCP_MODE" = true ]; then
                 log_file "🔍 双重检查发现已有server进程，取消启动"
                 for pid in $double_check_pids; do
                     if ps -p "$pid" > /dev/null 2>&1; then
-                        local retry_port=$(lsof -p "$pid" -i 2>/dev/null | grep LISTEN | grep -o ':\([0-9]*\)' | head -1 | cut -d: -f2)
+                        # 使用timeout防止lsof卡住，优先使用快速的端口扫描方式
+                        log_file "检测进程 $pid 的监听端口..."
+                        local retry_port=""
+                        
+                        # 方法1: 快速端口扫描（优先）
+                        for port in 3025 3026 3027 3028 3029; do
+                            if curl -s --max-time 0.5 "http://localhost:$port/" > /dev/null 2>&1; then
+                                retry_port=$port
+                                log_file "✅ 通过快速扫描发现端口: $port"
+                                break
+                            fi
+                        done
+                        
+                        # 方法2: 使用timeout保护的lsof（备用）
+                        if [ -z "$retry_port" ]; then
+                            log_file "快速扫描未找到端口，尝试使用lsof..."
+                            retry_port=$(timeout 2 lsof -p "$pid" -i 2>/dev/null | grep LISTEN | grep -o ':\([0-9]*\)' | head -1 | cut -d: -f2 2>/dev/null || echo "")
+                            if [ -n "$retry_port" ]; then
+                                log_file "✅ 通过lsof发现端口: $retry_port"
+                            else
+                                log_file "⚠️ lsof未找到端口信息"
+                            fi
+                        fi
+                        
                         if [ -n "$retry_port" ]; then
                             ACTUAL_PORT=$retry_port
-                            log_file "双重检查后发现可用服务器，PID: $pid, 端口: $retry_port"
+                            log_file "✅ 双重检查后发现可用服务器，PID: $pid, 端口: $retry_port，直接使用该服务器"
                             rm -f "$STARTUP_LOCK"
-                            break
+                            # 跳过server启动，直接使用现有server
+                            # 将ACTUAL_PORT设置后跳过启动部分
+                            break  # 找到一个有效端口就退出循环
                         fi
                     fi
                 done
+                # 如果找到了可用端口，跳过启动流程
+                if [ -n "$ACTUAL_PORT" ]; then
+                    log_file "🎯 复用现有server，跳过启动流程"
+                    # 不需要再继续启动，跳到后面的注册部分
+                else
+                    log_file "⚠️ 双重检查后未找到可用端口，需要启动新server"
+                    # 清理无效的PID，准备启动新server
+                    rm -f "$STARTUP_LOCK"
+                fi
             fi
         else
             # 无法获取锁，说明有其他进程在启动
@@ -1402,7 +1437,23 @@ if [ "$IS_MCP_MODE" = true ]; then
                 if [ -n "$retry_server_pids" ]; then
                     for pid in $retry_server_pids; do
                         if ps -p "$pid" > /dev/null 2>&1; then
-                            local retry_port=$(lsof -p "$pid" -i 2>/dev/null | grep LISTEN | grep -o ':\([0-9]*\)' | head -1 | cut -d: -f2)
+                            log_file "等待后发现server进程 $pid，检测端口..."
+                            local retry_port=""
+                            
+                            # 方法1: 快速端口扫描（优先）
+                            for port in 3025 3026 3027 3028 3029; do
+                                if curl -s --max-time 0.5 "http://localhost:$port/" > /dev/null 2>&1; then
+                                    retry_port=$port
+                                    log_file "✅ 通过快速扫描发现端口: $port"
+                                    break
+                                fi
+                            done
+                            
+                            # 方法2: 使用timeout保护的lsof（备用）
+                            if [ -z "$retry_port" ]; then
+                                retry_port=$(timeout 2 lsof -p "$pid" -i 2>/dev/null | grep LISTEN | grep -o ':\([0-9]*\)' | head -1 | cut -d: -f2 2>/dev/null || echo "")
+                            fi
+                            
                             if [ -n "$retry_port" ]; then
                                 ACTUAL_PORT=$retry_port
                                 log_file "等待后发现新启动的服务器，PID: $pid, 端口: $retry_port"
@@ -1418,11 +1469,22 @@ if [ "$IS_MCP_MODE" = true ]; then
             fi
         fi
         
-        # 6. 如果仍然没有找到server，则创建启动锁并启动新server
+        # 6. 如果仍然没有找到server（且双重检查也没找到），则创建启动锁并启动新server
         if [ -z "$ACTUAL_PORT" ]; then
-            mkdir -p "$SCRIPT_DIR/logs"
-            echo $$ > "$STARTUP_LOCK"
-            log_file "创建启动锁，PID: $$"
+            # 再次确认是否需要启动（可能在等待期间有其他进程启动了）
+            if [ -f "$STARTUP_LOCK" ]; then
+                lock_pid=$(cat "$STARTUP_LOCK" 2>/dev/null)
+                if [ "$lock_pid" != "$$" ]; then
+                    log_file "检测到已有启动锁（PID: $lock_pid），跳过启动"
+                    # 不需要启动，等待其他进程完成
+                else
+                    log_file "当前进程持有启动锁，继续启动流程"
+                fi
+            else
+                mkdir -p "$SCRIPT_DIR/logs"
+                echo $$ > "$STARTUP_LOCK"
+                log_file "创建启动锁，PID: $$"
+            fi
             
             # 使用引用计数管理器检查并整合server进程
         REF_COUNT_MANAGER="$SCRIPT_DIR/mcp_ref_count_manager.sh"
@@ -1480,9 +1542,30 @@ if [ "$IS_MCP_MODE" = true ]; then
             record_pid "$SERVER_PID" "browser-tools-server-main"
             record_pid "$NPM_PID" "browser-tools-npm-wrapper"
             
-            # 等待服务器启动
-            sleep 5
-            ACTUAL_PORT=$SERVER_PORT
+            # 等待服务器完全启动并验证
+            log_file "等待服务器完全启动..."
+            server_started=false
+            for i in {1..15}; do
+                if curl -s --max-time 1 "http://localhost:$SERVER_PORT/" > /dev/null 2>&1; then
+                    ACTUAL_PORT=$SERVER_PORT
+                    server_started=true
+                    log_file "✅ Server在端口$SERVER_PORT上启动成功"
+                    break
+                fi
+                log_file "等待server启动... (尝试 $i/15)"
+                sleep 1
+            done
+            
+            if [ "$server_started" = false ]; then
+                log_file "❌ 错误: Server启动超时或失败"
+                # 清理失败的进程
+                kill -TERM $NPM_PID 2>/dev/null || true
+                kill -TERM $SERVER_PID 2>/dev/null || true
+                rm -f "$SERVER_PID_FILE"
+                rm -f "$STARTUP_LOCK" 2>/dev/null
+                # 不继续执行，直接退出
+                exit 1
+            fi
             
             # 清理启动锁
             rm -f "$STARTUP_LOCK" 2>/dev/null
@@ -1548,14 +1631,55 @@ if [ "$IS_MCP_MODE" = true ]; then
             log_file "DEBUG: 引用计数管理器未找到有效server"
             log_file "📋 引用计数管理器未找到有效server，启动新server..."
             nohup npx -y @agentdeskai/browser-tools-server@1.2.0 --port=$SERVER_PORT >> "$LOG_FILE" 2>&1 &
-            SERVER_PID=$!
+            NPM_PID=$!
+            log_file "NPM进程ID: $NPM_PID，等待实际node server进程..."
+            
+            # 等待并获取实际的node服务器进程PID
+            sleep 3
+            SERVER_PID=""
+            for i in {1..10}; do
+                NODE_PID=$(pgrep -P $NPM_PID 2>/dev/null | head -1)
+                if [ -n "$NODE_PID" ] && ps -p "$NODE_PID" -o args= 2>/dev/null | grep -q "browser-tools-server"; then
+                    SERVER_PID=$NODE_PID
+                    log_file "找到实际node server进程: $SERVER_PID"
+                    break
+                fi
+                sleep 1
+            done
+            
+            if [ -z "$SERVER_PID" ]; then
+                log_file "警告: 无法找到实际的node服务器进程，使用NPM进程ID: $NPM_PID"
+                SERVER_PID=$NPM_PID
+            fi
+            
             echo "$SERVER_PID" > "$SERVER_PID_FILE"
             record_pid "$SERVER_PID" "browser-tools-server-main-new"
+            record_pid "$NPM_PID" "browser-tools-npm-wrapper-new"
             log_file "新server进程ID: $SERVER_PID，端口: $SERVER_PORT，PID文件已创建"
             
-            # 等待server启动
-            sleep 3
-            ACTUAL_PORT=$SERVER_PORT
+            # 等待server完全启动并验证端口响应
+            log_file "等待server完全启动..."
+            server_started=false
+            for i in {1..15}; do
+                if curl -s --max-time 1 "http://localhost:$SERVER_PORT/" > /dev/null 2>&1; then
+                    ACTUAL_PORT=$SERVER_PORT
+                    server_started=true
+                    log_file "✅ Server在端口$SERVER_PORT上启动成功"
+                    break
+                fi
+                log_file "等待server启动... (尝试 $i/15)"
+                sleep 1
+            done
+            
+            if [ "$server_started" = false ]; then
+                log_file "❌ 错误: Server启动超时或失败"
+                # 清理失败的进程
+                kill -TERM $NPM_PID 2>/dev/null || true
+                kill -TERM $SERVER_PID 2>/dev/null || true
+                rm -f "$SERVER_PID_FILE"
+                # 不继续执行，直接退出
+                exit 1
+            fi
         fi
         
         # 验证PID文件是否存在，如果不存在则重新创建
@@ -1567,6 +1691,8 @@ if [ "$IS_MCP_MODE" = true ]; then
                 log_file "✅ 重新创建SERVER_PID_FILE成功: $SERVER_PID"
             else
                 log_file "❌ 错误: 无法重新创建PID文件，SERVER_PID无效或进程不存在"
+                log_file "❌ 终止MCP客户端启动流程"
+                exit 1
             fi
         else
             log_file "✅ SERVER_PID_FILE验证通过: $(cat "$SERVER_PID_FILE" 2>/dev/null)"

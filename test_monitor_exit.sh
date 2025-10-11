@@ -303,3 +303,19 @@ trap 'log_test "收到中断信号，清理测试环境..."; cleanup_test; exit 
 main "$@"
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
