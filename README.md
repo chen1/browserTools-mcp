@@ -2,7 +2,7 @@
  * @Author: chenjie chenjie@huimei.com
  * @Date: 2025-09-26 12:00:48
  * @LastEditors: chenjie chenjie@huimei.com
- * @LastEditTime: 2025-09-26 12:01:32
+ * @LastEditTime: 2025-10-14 19:57:34
  * @FilePath: /browser-tools/README.md
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 -->
@@ -84,3 +84,7 @@ cd ~/browser-tools
 - **问题**: 多个Cursor窗口启动MCP客户端，共用一个server，关闭所有客户端时server未被清理
 - **解决**: 使用引用计数跟踪活跃客户端数量，只有当所有客户端都退出时才清理server
 - **优势**: 支持并发操作，使用文件锁防止竞态条件
+
+
+## 调试mcp服务
+-- npx @modelcontextprotocol/inspector --config ./inspector-config.json --server browser-tools

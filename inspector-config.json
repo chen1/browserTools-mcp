@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "browser-tools": {
+      "command": "./browser-tools.sh",
+      "args": [],
+      "env": {}
+    }
+  }
+}
