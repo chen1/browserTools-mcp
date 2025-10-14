@@ -375,10 +375,10 @@ case "${1:-}" in
         ;;
     "ensure-single-server")
         if ensure_single_server; then
-            echo "server整合完成"
+            log_ref_count "server整合完成"
             exit 0
         else
-            echo "没有发现运行中的server"
+            log_ref_count "没有发现运行中的server"
             exit 1
         fi
         ;;
@@ -387,23 +387,23 @@ case "${1:-}" in
             echo "$server_pid"
             exit 0
         else
-            echo "没有发现运行中的server"
+            log_ref_count "没有发现运行中的server"
             exit 1
         fi
         ;;
     *)
-        echo "用法: $0 {increment|decrement|get|set|should-cleanup|cleanup|status|ensure-single-server|get-server-pid}"
-        echo ""
-        echo "命令说明:"
-        echo "  increment           - 递增引用计数"
-        echo "  decrement           - 递减引用计数"
-        echo "  get                - 获取当前引用计数"
-        echo "  set <count>        - 设置引用计数为指定值"
-        echo "  should-cleanup     - 检查是否应该清理server (返回true/false)"
-        echo "  cleanup            - 清理引用计数文件"
-        echo "  status             - 显示当前状态"
-        echo "  ensure-single-server - 确保只有一个server实例运行"
-        echo "  get-server-pid     - 获取共享server的PID"
+        log_ref_count "用法: $0 {increment|decrement|get|set|should-cleanup|cleanup|status|ensure-single-server|get-server-pid}"
+        log_ref_count ""
+        log_ref_count "命令说明:"
+        log_ref_count "  increment           - 递增引用计数"
+        log_ref_count "  decrement           - 递减引用计数"
+        log_ref_count "  get                - 获取当前引用计数"
+        log_ref_count "  set <count>        - 设置引用计数为指定值"
+        log_ref_count "  should-cleanup     - 检查是否应该清理server (返回true/false)"
+        log_ref_count "  cleanup            - 清理引用计数文件"
+        log_ref_count "  status             - 显示当前状态"
+        log_ref_count "  ensure-single-server - 确保只有一个server实例运行"
+        log_ref_count "  get-server-pid     - 获取共享server的PID"
         exit 1
         ;;
 esac

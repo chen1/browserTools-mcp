@@ -93,6 +93,19 @@ log_file() {
     sync 2>/dev/null || true
 }
 
+# 安全输出函数 - 根据运行模式决定输出方式
+safe_output() {
+    local message="$1"
+    if [ "$IS_MCP_MODE" = true ]; then
+        # MCP模式下只写日志，避免干扰JSON通信
+        log_file "$message"
+    else
+        # 终端模式下可以正常输出到stdout
+        echo "$message"
+        log_file "$message"
+    fi
+}
+
 # 诊断MCP客户端退出原因
 diagnose_mcp_exit() {
     local mcp_pid=$1
@@ -681,14 +694,14 @@ stop_services_mcp_enhanced() {
             
             # 安全检查
             if echo "$process_cmd" | grep -q "@agentdeskai.*browser-tools"; then
-                echo "$timestamp [info] 正在终止MCP客户端进程 $MCP_PID..."
+                output_log "$timestamp [info] 正在终止MCP客户端进程 $MCP_PID..." "$silent_mode"
                 log_stop "正在终止MCP客户端进程 $MCP_PID: $process_cmd"
                 
                 # 优雅终止
                 if kill -TERM "$MCP_PID" 2>/dev/null; then
                     sleep 2
                     if ps -p "$MCP_PID" > /dev/null 2>&1; then
-                        echo "$timestamp [info] 强制终止MCP客户端进程 $MCP_PID"
+                        output_log "$timestamp [info] 强制终止MCP客户端进程 $MCP_PID" "$silent_mode"
                         kill -9 "$MCP_PID" 2>/dev/null || true
                         sleep 1
                     fi
@@ -698,7 +711,7 @@ stop_services_mcp_enhanced() {
                         log_stop "❌ MCP客户端进程 $MCP_PID 终止失败"
                         failed_count=$((failed_count + 1))
                     else
-                        echo "$timestamp [info] ✅ MCP客户端进程 $MCP_PID 已成功终止"
+                        output_log "$timestamp [info] ✅ MCP客户端进程 $MCP_PID 已成功终止" "$silent_mode"
                         log_stop "✅ MCP客户端进程 $MCP_PID 已成功终止"
                         terminated_count=$((terminated_count + 1))
                     fi
@@ -713,12 +726,12 @@ stop_services_mcp_enhanced() {
                 skipped_count=$((skipped_count + 1))
             fi
         else
-            echo "$timestamp [info] MCP客户端进程不存在或已退出"
+            output_log "$timestamp [info] MCP客户端进程不存在或已退出" "$silent_mode"
             log_stop "📋 MCP客户端进程不存在或已退出"
         fi
         rm -f "$MCP_PID_FILE"
     else
-        echo "$timestamp [info] 未找到MCP客户端PID文件"
+        output_log "$timestamp [info] 未找到MCP客户端PID文件" "$silent_mode"
         log_stop "📋 未找到MCP客户端PID文件: $MCP_PID_FILE"
     fi
     
@@ -730,21 +743,21 @@ stop_services_mcp_enhanced() {
             local process_info=$(ps -p "$SERVER_PID" -o pid,ppid,user,comm,args 2>/dev/null || echo "进程信息获取失败")
             local process_cmd=$(ps -p "$SERVER_PID" -o args= 2>/dev/null || echo "未知命令")
             
-            echo "$timestamp [info] 发现服务器进程:"
-            echo "$timestamp [info]   PID: $SERVER_PID"
-            echo "$timestamp [info]   命令: $process_cmd"
-            echo "$timestamp [info]   详细信息: $process_info"
+            output_log "$timestamp [info] 发现服务器进程:" "$silent_mode"
+            output_log "$timestamp [info]   PID: $SERVER_PID" "$silent_mode"
+            output_log "$timestamp [info]   命令: $process_cmd" "$silent_mode"
+            output_log "$timestamp [info]   详细信息: $process_info" "$silent_mode"
             
             # 安全检查
             if echo "$process_cmd" | grep -q "@agentdeskai.*browser-tools"; then
-                echo "$timestamp [info] 正在终止服务器进程 $SERVER_PID..."
+                output_log "$timestamp [info] 正在终止服务器进程 $SERVER_PID..." "$silent_mode"
                 log_stop "正在终止服务器进程 $SERVER_PID: $process_cmd"
                 
                 # 优雅终止
                 if kill -TERM "$SERVER_PID" 2>/dev/null; then
                     sleep 2
                     if ps -p "$SERVER_PID" > /dev/null 2>&1; then
-                        echo "$timestamp [info] 强制终止服务器进程 $SERVER_PID"
+                        output_log "$timestamp [info] 强制终止服务器进程 $SERVER_PID" "$silent_mode"
                         kill -9 "$SERVER_PID" 2>/dev/null || true
                         sleep 1
                     fi
@@ -754,7 +767,7 @@ stop_services_mcp_enhanced() {
                         log_stop "❌ 服务器进程 $SERVER_PID 终止失败"
                         failed_count=$((failed_count + 1))
                     else
-                        echo "$timestamp [info] ✅ 服务器进程 $SERVER_PID 已成功终止"
+                        output_log "$timestamp [info] ✅ 服务器进程 $SERVER_PID 已成功终止" "$silent_mode"
                         log_stop "✅ 服务器进程 $SERVER_PID 已成功终止"
                         terminated_count=$((terminated_count + 1))
                     fi
@@ -769,44 +782,44 @@ stop_services_mcp_enhanced() {
                 skipped_count=$((skipped_count + 1))
             fi
         else
-            echo "$timestamp [info] 服务器进程不存在或已退出"
+            output_log "$timestamp [info] 服务器进程不存在或已退出" "$silent_mode"
             log_stop "📋 服务器进程不存在或已退出"
         fi
         rm -f "$SERVER_PID_FILE"
     else
-        echo "$timestamp [info] 未找到服务器PID文件"
+        output_log "$timestamp [info] 未找到服务器PID文件" "$silent_mode"
         log_stop "📋 未找到服务器PID文件: $SERVER_PID_FILE"
     fi
     
     # 3. 清理其他记录文件
     if [ -f "$ALL_PIDS_FILE" ]; then
-        echo "$timestamp [info] 清理进程记录文件: $ALL_PIDS_FILE"
+        output_log "$timestamp [info] 清理进程记录文件: $ALL_PIDS_FILE" "$silent_mode"
         log_stop "清理进程记录文件: $ALL_PIDS_FILE"
         rm -f "$ALL_PIDS_FILE"
     fi
     
     # 4. 检查端口释放情况
     if [ -n "$ACTUAL_PORT" ]; then
-        echo "$timestamp [info] 检查端口 $ACTUAL_PORT 释放情况..."
+        output_log "$timestamp [info] 检查端口 $ACTUAL_PORT 释放情况..." "$silent_mode"
         if lsof -i:$ACTUAL_PORT > /dev/null 2>&1; then
             echo "$timestamp [warn] 端口 $ACTUAL_PORT 仍被占用"
             local port_info=$(lsof -i:$ACTUAL_PORT 2>/dev/null | head -5)
             if [ -n "$port_info" ]; then
-                echo "$timestamp [info] 占用端口的进程:"
+                output_log "$timestamp [info] 占用端口的进程:" "$silent_mode"
                 echo "$port_info" | while IFS= read -r line; do
-                    echo "$timestamp [info]   $line"
+                    output_log "$timestamp [info]   $line" "$silent_mode"
                 done
             fi
         else
-            echo "$timestamp [info] 端口 $ACTUAL_PORT 已释放"
+            output_log "$timestamp [info] 端口 $ACTUAL_PORT 已释放" "$silent_mode"
         fi
     fi
     
     # 5. 生成终止报告
-    echo "$timestamp [info] ===== MCP增强模式终止报告 ====="
-    echo "$timestamp [info] 成功终止进程数: $terminated_count"
-    echo "$timestamp [info] 终止失败进程数: $failed_count"  
-    echo "$timestamp [info] 跳过进程数: $skipped_count"
+    output_log "$timestamp [info] ===== MCP增强模式终止报告 =====" "$silent_mode"
+    output_log "$timestamp [info] 成功终止进程数: $terminated_count" "$silent_mode"
+    output_log "$timestamp [info] 终止失败进程数: $failed_count" "$silent_mode"
+    output_log "$timestamp [info] 跳过进程数: $skipped_count" "$silent_mode"
     
     log_stop "===== MCP增强模式终止报告 ====="
     log_stop "成功终止进程数: $terminated_count"
@@ -814,7 +827,7 @@ stop_services_mcp_enhanced() {
     log_stop "跳过进程数: $skipped_count"
     
     if [ $failed_count -eq 0 ]; then
-        echo "$timestamp [info] ✅ 所有browser-tools进程已安全终止"
+        output_log "$timestamp [info] ✅ 所有browser-tools进程已安全终止" "$silent_mode"
         log_stop "✅ 所有browser-tools进程已安全终止"
     else
         echo "$timestamp [warn] ⚠️ 部分进程终止失败，详情请查看: $STOP_LOG_FILE"
@@ -953,12 +966,10 @@ cleanup_and_exit() {
         log_file "$(date '+%Y-%m-%d %H:%M:%S.%3N') [info] browser-tools服务清理完成"
     else
         # 终端模式可以正常输出到标准输出
-        echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') [info] 收到信号 $signal，开始清理browser-tools服务..."
-        log_file "$(date '+%Y-%m-%d %H:%M:%S.%3N') [info] 收到信号 $signal，开始清理browser-tools服务..."
-        echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') [info] 终端模式: 开始停止所有browser-tools服务..."
+        safe_output "收到信号 $signal，开始清理browser-tools服务..."
+        safe_output "终端模式: 开始停止所有browser-tools服务..."
         stop_services
-        echo "$(date '+%Y-%m-%d %H:%M:%S.%3N') [info] browser-tools服务清理完成"
-        log_file "$(date '+%Y-%m-%d %H:%M:%S.%3N') [info] browser-tools服务清理完成"
+        safe_output "browser-tools服务清理完成"
     fi
     exit 0
 }
@@ -1170,9 +1181,9 @@ start_services() {
                 if [ -z "$mcp_process_info" ]; then
                     local timestamp=$(date '+%Y-%m-%d %H:%M:%S.%3N')
                     
-                    # 立即输出到标准输出，让用户看到详细信息
-                    echo "$timestamp [info] MCP客户端进程 $MCP_PID 已退出"
-                    echo "$timestamp [info] 开始分析MCP客户端退出原因..."
+                    # 输出到日志文件，避免干扰MCP协议的JSON通信
+                    log_file "$timestamp [info] MCP客户端进程 $MCP_PID 已退出"
+                    log_file "$timestamp [info] 开始分析MCP客户端退出原因..."
                     
                     log_file "MCP客户端进程 $MCP_PID 不存在"
                     log_file "MCP客户端进程已退出，分析退出原因..."
@@ -1180,30 +1191,30 @@ start_services() {
                     # 尝试获取进程退出状态，但不依赖wait命令
                     local exit_code=0
                     # wait $MCP_PID 2>/dev/null  # 注释掉可能有问题的wait命令
-                    echo "$timestamp [info] MCP客户端退出码: $exit_code (在后台进程模式下可能不准确)"
+                    log_file "$timestamp [info] MCP客户端退出码: $exit_code (在后台进程模式下可能不准确)"
                     log_file "MCP客户端退出码: $exit_code (注意: 在后台进程模式下可能不准确)"
                     
-                    # 输出详细的进程信息
-                    echo "$timestamp [info] MCP客户端进程详情:"
-                    echo "$timestamp [info]   进程ID: $MCP_PID"
-                    echo "$timestamp [info]   连接端口: $ACTUAL_PORT"
+                    # 输出详细的进程信息到日志文件
+                    log_file "$timestamp [info] MCP客户端进程详情:"
+                    log_file "$timestamp [info]   进程ID: $MCP_PID"
+                    log_file "$timestamp [info]   连接端口: $ACTUAL_PORT"
                     if [ -f "$MCP_PID_FILE" ]; then
-                        echo "$timestamp [info]   PID文件: $MCP_PID_FILE"
+                        log_file "$timestamp [info]   PID文件: $MCP_PID_FILE"
                     fi
                     
                     # 检查端口状态
                     if [ -n "$ACTUAL_PORT" ]; then
                         if lsof -i:$ACTUAL_PORT > /dev/null 2>&1; then
-                            echo "$timestamp [info]   端口状态: $ACTUAL_PORT 仍被占用"
+                            log_file "$timestamp [info]   端口状态: $ACTUAL_PORT 仍被占用"
                             local port_info=$(lsof -i:$ACTUAL_PORT 2>/dev/null | head -3)
                             if [ -n "$port_info" ]; then
-                                echo "$timestamp [info]   占用端口的进程:"
+                                log_file "$timestamp [info]   占用端口的进程:"
                                 echo "$port_info" | while IFS= read -r line; do
-                                    echo "$timestamp [info]     $line"
+                                    log_file "$timestamp [info]     $line"
                                 done
                             fi
                         else
-                            echo "$timestamp [info]   端口状态: $ACTUAL_PORT 已释放"
+                            log_file "$timestamp [info]   端口状态: $ACTUAL_PORT 已释放"
                         fi
                     fi
                     
@@ -1212,13 +1223,13 @@ start_services() {
                     
                     # 检查是否是正常退出（通过信号）
                     if [ -f "logs/browser-tools-shutdown" ]; then
-                        echo "$timestamp [info] 检测到正常关闭信号，开始清理服务器进程..."
+                        log_file "$timestamp [info] 检测到正常关闭信号，开始清理服务器进程..."
                         log_file "检测到正常关闭信号，清理服务器进程..."
                         rm -f "logs/browser-tools-shutdown"
                         
-                        echo "$timestamp [info] 执行服务清理程序..."
+                        log_file "$timestamp [info] 执行服务清理程序..."
                         stop_services
-                        echo "$timestamp [info] 所有browser-tools服务已完全停止"
+                        log_file "$timestamp [info] 所有browser-tools服务已完全停止"
                         exit 0
                     fi
                     
@@ -1235,24 +1246,24 @@ start_services() {
                     fi
                     
                     # 检查服务器是否可达 - 改进的检查方法
-                    echo "$timestamp [info] 检查服务器端口 $ACTUAL_PORT 可达性..."
+                    log_file "$timestamp [info] 检查服务器端口 $ACTUAL_PORT 可达性..."
                     if ! lsof -i:$ACTUAL_PORT > /dev/null 2>&1; then
                         echo "$timestamp [error] 服务器端口 $ACTUAL_PORT 不可达，停止重试"
                         log_file "服务器端口不可达，停止重试"
                         exit 1
                     else
-                        echo "$timestamp [info] 服务器端口 $ACTUAL_PORT 正常监听"
+                        log_file "$timestamp [info] 服务器端口 $ACTUAL_PORT 正常监听"
                     fi
                     
                     # 额外的HTTP检查（允许404响应，因为根路径可能不存在）
-                    echo "$timestamp [info] 检查服务器HTTP响应..."
+                    log_file "$timestamp [info] 检查服务器HTTP响应..."
                     local http_response=$(curl -s -w "%{http_code}" "http://localhost:$ACTUAL_PORT/" -o /dev/null 2>/dev/null || echo "000")
                     if [ "$http_response" = "000" ]; then
                         echo "$timestamp [error] 服务器HTTP不响应，停止重试"
                         log_file "服务器HTTP不响应，停止重试"
                         exit 1
                     else
-                        echo "$timestamp [info] 服务器HTTP响应正常 (状态码: $http_response)"
+                        log_file "$timestamp [info] 服务器HTTP响应正常 (状态码: $http_response)"
                         log_file "服务器HTTP响应正常 (状态码: $http_response)"
                     fi
                     
@@ -1260,27 +1271,27 @@ start_services() {
                     if [ $consecutive_failures -ge $max_consecutive_failures ]; then
                         echo "$timestamp [error] MCP客户端连续失败 $max_consecutive_failures 次，停止服务"
                         log_file "MCP客户端连续失败 $max_consecutive_failures 次，停止服务"
-                        echo "$timestamp [info] 开始清理所有browser-tools服务..."
+                        log_file "$timestamp [info] 开始清理所有browser-tools服务..."
                         stop_services
-                        echo "$timestamp [info] 服务清理完成，退出程序"
+                        log_file "$timestamp [info] 服务清理完成，退出程序"
                         exit 1
                     fi
                     
                     # 尝试重启MCP客户端
                     local remaining_retries=$((max_consecutive_failures - consecutive_failures))
-                    echo "$timestamp [info] 尝试重启MCP客户端... (剩余重试次数: $remaining_retries)"
+                    log_file "$timestamp [info] 尝试重启MCP客户端... (剩余重试次数: $remaining_retries)"
                     log_file "尝试重启MCP客户端... (剩余重试次数: $remaining_retries)"
                     
-                    echo "$timestamp [info] 等待5秒后重启..."
+                    log_file "$timestamp [info] 等待5秒后重启..."
                     sleep 5
                     
-                    echo "$timestamp [info] 启动新的MCP客户端进程..."
+                    log_file "$timestamp [info] 启动新的MCP客户端进程..."
                     npx -y @agentdeskai/browser-tools-mcp@1.2.0 --port=$ACTUAL_PORT &
                     MCP_PID=$!
                     echo $MCP_PID > "$MCP_PID_FILE"
                     record_pid "$MCP_PID" "browser-tools-mcp-main-restart"
                     
-                    echo "$timestamp [info] MCP客户端重启完成，新进程ID: $MCP_PID"
+                    log_file "$timestamp [info] MCP客户端重启完成，新进程ID: $MCP_PID"
                     log_file "MCP客户端重启，新进程ID: $MCP_PID"
                     
                     sleep 8
@@ -1293,11 +1304,11 @@ start_services() {
                     echo "$timestamp [error] 服务器进程 $SERVER_PID 意外退出，清理MCP客户端进程..."
                     log_file "服务器进程意外退出，清理MCP客户端进程..."
                     
-                    echo "$timestamp [info] 终止MCP客户端进程 $MCP_PID..."
+                    log_file "$timestamp [info] 终止MCP客户端进程 $MCP_PID..."
                     kill $MCP_PID 2>/dev/null || true
                     sleep 1
                     
-                    echo "$timestamp [info] browser-tools服务异常终止"
+                    log_file "$timestamp [info] browser-tools服务异常终止"
                     exit 1
                 fi
                 
@@ -1305,7 +1316,7 @@ start_services() {
                 if [ $consecutive_failures -gt 0 ]; then
                     local timestamp=$(date '+%Y-%m-%d %H:%M:%S.%3N')
                     consecutive_failures=0
-                    echo "$timestamp [info] MCP客户端恢复正常运行，重置失败计数器"
+                    log_file "$timestamp [info] MCP客户端恢复正常运行，重置失败计数器"
                     log_file "MCP客户端恢复正常运行，重置失败计数器"
                 fi
                 
