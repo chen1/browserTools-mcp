@@ -1374,7 +1374,7 @@ if [ "$IS_MCP_MODE" = true ]; then
                     if ps -p "$pid" > /dev/null 2>&1; then
                         # 使用timeout防止lsof卡住，优先使用快速的端口扫描方式
                         log_file "检测进程 $pid 的监听端口..."
-                        local retry_port=""
+                        retry_port=""
                         
                         # 方法1: 快速端口扫描（优先）
                         for port in 3025 3026 3027 3028 3029; do
@@ -1433,12 +1433,12 @@ if [ "$IS_MCP_MODE" = true ]; then
                     fi
                 done
                 # 重新检测是否有server启动了
-                local retry_server_pids=$(pgrep -f "browser-tools-server" 2>/dev/null)
+                retry_server_pids=$(pgrep -f "browser-tools-server" 2>/dev/null)
                 if [ -n "$retry_server_pids" ]; then
                     for pid in $retry_server_pids; do
                         if ps -p "$pid" > /dev/null 2>&1; then
                             log_file "等待后发现server进程 $pid，检测端口..."
-                            local retry_port=""
+                            retry_port=""
                             
                             # 方法1: 快速端口扫描（优先）
                             for port in 3025 3026 3027 3028 3029; do
