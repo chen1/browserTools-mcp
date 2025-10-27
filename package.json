@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@agentdeskai/browser-tools-mcp": "^1.2.0",
+    "@agentdeskai/browser-tools-server": "^1.2.0"
+  }
+}

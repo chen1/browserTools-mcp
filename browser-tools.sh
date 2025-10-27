@@ -3,13 +3,32 @@
 # @Author: chenjie chenjie@huimei.com
 # @Date: 2025-01-27 
  # @LastEditors: chenjie chenjie@huimei.com
- # @LastEditTime: 2025-09-24 15:50:21
+ # @LastEditTime: 2025-10-27 16:36:04
 # @FilePath: browser-tools.sh
 # @Description: 合并的browser-tools启动和停止脚本，支持信号处理
 ### 
 
+# 解析命令行参数
+SET_CUSTOM_PATH=false
+for arg in "$@"; do
+    if [ "$arg" = "path=true" ]; then
+        SET_CUSTOM_PATH=true
+        break
+    fi
+done
+
 # 获取脚本所在目录的绝对路径
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# 根据参数决定是否设置自定义环境变量
+if [ "$SET_CUSTOM_PATH" = true ]; then
+    # 设置必要的环境变量，确保能找到node/npm/npx
+    export PATH="/usr/local/opt/node@18/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+    NPX_PATH=$(which npx 2>/dev/null || echo "/usr/local/opt/node@18/bin/npx")
+else
+    # 使用默认的npx路径
+    NPX_PATH=$(which npx 2>/dev/null || echo "npx")
+fi
 
 # 设置日志文件和端口（使用绝对路径）
 LOG_FILE="$SCRIPT_DIR/logs/browser-tools.log"
@@ -1021,7 +1040,7 @@ start_services() {
     # 启动Browser Tools Server
     log_file "正在启动Browser Tools Server..."
     # 在macOS上使用nohup代替setsid
-    nohup npx -y @agentdeskai/browser-tools-server@1.2.0 --port=$SERVER_PORT >> "$LOG_FILE" 2>&1 &
+    nohup "$NPX_PATH" -y @agentdeskai/browser-tools-server@1.2.0 --port=$SERVER_PORT >> "$LOG_FILE" 2>&1 &
     NPM_PID=$!
     log_file "NPM包装进程ID: $NPM_PID"
     log_file "🎯 新终止策略: 使用递归子进程终止，不依赖进程组"
@@ -1161,7 +1180,7 @@ start_services() {
             log_file "服务器确认可达，启动MCP客户端..."
             
             # 启动MCP客户端进程，使用实际端口
-            npx -y @agentdeskai/browser-tools-mcp@1.2.0 --port=$ACTUAL_PORT &
+            "$NPX_PATH" -y @agentdeskai/browser-tools-mcp@1.2.0 --port=$ACTUAL_PORT &
             MCP_PID=$!
             echo $MCP_PID > "$MCP_PID_FILE"
             record_pid "$MCP_PID" "browser-tools-mcp-main"
@@ -1286,7 +1305,7 @@ start_services() {
                     sleep 5
                     
                     log_file "$timestamp [info] 启动新的MCP客户端进程..."
-                    npx -y @agentdeskai/browser-tools-mcp@1.2.0 --port=$ACTUAL_PORT &
+                    "$NPX_PATH" -y @agentdeskai/browser-tools-mcp@1.2.0 --port=$ACTUAL_PORT &
                     MCP_PID=$!
                     echo $MCP_PID > "$MCP_PID_FILE"
                     record_pid "$MCP_PID" "browser-tools-mcp-main-restart"
@@ -1529,7 +1548,7 @@ if [ "$IS_MCP_MODE" = true ]; then
         # 如果没有可用的服务器，启动新的
         if [ -z "$ACTUAL_PORT" ]; then
             log_file "启动新的服务器..."
-            nohup npx -y @agentdeskai/browser-tools-server@1.2.0 --port=$SERVER_PORT >> "$LOG_FILE" 2>&1 &
+            nohup "$NPX_PATH" -y @agentdeskai/browser-tools-server@1.2.0 --port=$SERVER_PORT >> "$LOG_FILE" 2>&1 &
             NPM_PID=$!
             
             # 等待并获取实际的node服务器进程PID
@@ -1641,7 +1660,7 @@ if [ "$IS_MCP_MODE" = true ]; then
             # 没有找到有效server，启动新的
             log_file "DEBUG: 引用计数管理器未找到有效server"
             log_file "📋 引用计数管理器未找到有效server，启动新server..."
-            nohup npx -y @agentdeskai/browser-tools-server@1.2.0 --port=$SERVER_PORT >> "$LOG_FILE" 2>&1 &
+            nohup "$NPX_PATH" -y @agentdeskai/browser-tools-server@1.2.0 --port=$SERVER_PORT >> "$LOG_FILE" 2>&1 &
             NPM_PID=$!
             log_file "NPM进程ID: $NPM_PID，等待实际node server进程..."
             
@@ -1733,7 +1752,7 @@ if [ "$IS_MCP_MODE" = true ]; then
     
     # 直接执行MCP客户端（前台运行，作为Cursor的MCP服务器）
     log_file "启动MCP客户端，连接到端口: $ACTUAL_PORT"
-    exec npx -y @agentdeskai/browser-tools-mcp@1.2.0 --port=$ACTUAL_PORT
+    exec "$NPX_PATH" -y @agentdeskai/browser-tools-mcp@1.2.0 --port=$ACTUAL_PORT
 else
     # 主逻辑：默认启动服务
     # 所有启动信息都记录到日志文件，避免干扰MCP客户端的JSON输出
